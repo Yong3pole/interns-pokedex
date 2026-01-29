@@ -1,15 +1,57 @@
 name: CI
 
 on:
-  push:
-    branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
 
 jobs:
+  extract-pr-info:
+    name: Extract PR Information
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract Full Name and Umindanao Email from PR Body
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          echo "📋 Extracting information from Pull Request body..."
+          echo ""
+          
+          # Extract Full Name
+          FULL_NAME=$(echo "$PR_BODY" | grep -oP '(?<=Full Name:\s).*' | head -1 | xargs)
+          
+          # Extract Umindanao Email
+          UMINDANAO_EMAIL=$(echo "$PR_BODY" | grep -oP '(?<=Umindanao Email:\s).*' | head -1 | xargs)
+          
+          # Validate Full Name
+          if [ -z "$FULL_NAME" ]; then
+            echo "::error::Full Name not found in PR body. Please ensure your PR body contains 'Full Name: Your Name'"
+            exit 1
+          fi
+          
+          # Validate Umindanao Email exists
+          if [ -z "$UMINDANAO_EMAIL" ]; then
+            echo "::error::Umindanao Email not found in PR body. Please ensure your PR body contains 'Umindanao Email: your.email@umindanao.edu.ph'"
+            exit 1
+          fi
+          
+          # Validate Umindanao Email format: <initial>.<lastname>.<6-digit-id>@umindanao.edu.ph
+          EMAIL_REGEX='^[a-zA-Z]\.[a-zA-Z]+\.[0-9]{6}@umindanao\.edu\.ph$'
+          if ! echo "$UMINDANAO_EMAIL" | grep -qE "$EMAIL_REGEX"; then
+            echo "::error::Invalid Umindanao Email format. Expected format: <initial of firstname>.<lastname>.<6 digit id number>@umindanao.edu.ph (e.g., j.delacruz.123456@umindanao.edu.ph)"
+            exit 1
+          fi
+          
+          echo "=========================================="
+          echo "📝 Pull Request Information"
+          echo "=========================================="
+          echo "Full Name: $FULL_NAME"
+          echo "Umindanao Email: $UMINDANAO_EMAIL"
+          echo "=========================================="
+
   gitignore-check:
     name: Gitignore Integrity Check
     runs-on: ubuntu-latest
+    needs: [extract-pr-info]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
